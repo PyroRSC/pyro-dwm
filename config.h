@@ -13,7 +13,7 @@ static const unsigned int gappov    = 10;       /* vert outer gap between window
 static       int smartgaps          = 0;        /* 1 means no outer gap when there is only one window */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
-static const char *fonts[]          = { "Font Awesome 6 Free Solid:size=12" };
+static const char *fonts[]          = { "monospace:size=10" };
 static const char dmenufont[]       = "monospace:size=10";
 static const char col_gray1[]       = "#404242";
 static const char col_gray2[]       = "#706b6b";
@@ -22,11 +22,15 @@ static const char col_gray4[]       = "#eeeeee";
 static const char col_cyan[]        = "#db5353";
 static const unsigned int baralpha = 0xd0;
 static const unsigned int borderalpha = OPAQUE;
-static const char *colors[][3]      = {
+static const char *colors[][5]      = {
 	/*               fg         bg         border   */
 	[SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
 	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
+	[SchemeHov]  = { col_gray4, col_cyan,  col_cyan  },
+	[SchemeHid]  = { col_cyan,  col_gray1, col_cyan  },
 };
+
+/* tagging */
 static const unsigned int alphas[][3]      = {
     /*               fg      bg        border*/
     [SchemeNorm] = { OPAQUE, baralpha, borderalpha },
@@ -102,7 +106,7 @@ static const Layout layouts[] = {
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
-static const char *dmenucmd[] = { "dmenu_run", NULL };
+static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
 static const char *termcmd[]  = { "st", NULL };
 
 static const Key keys[] = {
@@ -110,10 +114,10 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_p,      spawn,          {.v = dmenucmd } },
 	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = termcmd } },
 	{ MODKEY,                       XK_b,      togglebar,      {0} },
-	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
-	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } },
-	{ MODKEY|ShiftMask,             XK_j,      cycleview,      {1} },
-	{ MODKEY|ShiftMask,             XK_k,      cycleview,      {0} },
+	{ MODKEY,                       XK_j,      focusstackvis,  {.i = +1 } },
+	{ MODKEY,                       XK_k,      focusstackvis,  {.i = -1 } },
+	{ MODKEY|ShiftMask,             XK_j,      cycleview,  {.i = +1 } },
+	{ MODKEY|ShiftMask,             XK_k,      cycleview,  {.i = -1 } },
 	{ MODKEY,                       XK_i,      incnmaster,     {.i = +1 } },
 	{ MODKEY,                       XK_d,      incnmaster,     {.i = -1 } },
 	{ MODKEY,                       XK_h,      setmfact,       {.f = -0.05} },
@@ -153,6 +157,9 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_period, focusmon,       {.i = +1 } },
 	{ MODKEY|ShiftMask,             XK_comma,  tagmon,         {.i = -1 } },
 	{ MODKEY|ShiftMask,             XK_period, tagmon,         {.i = +1 } },
+	{ MODKEY,                       XK_s,      show,           {0} },
+	{ MODKEY|ShiftMask,             XK_s,      showall,        {0} },
+	{ MODKEY,                       XK_h,      hide,           {0} },
 	TAGKEYS(                        XK_1,                      0)
 	TAGKEYS(                        XK_2,                      1)
 	TAGKEYS(                        XK_3,                      2)
@@ -177,12 +184,13 @@ static const Button buttons[] = {
 	/* click                event mask      button          function        argument */
 	{ ClkLtSymbol,          0,              Button1,        setlayout,      {0} },
 	{ ClkLtSymbol,          0,              Button3,        setlayout,      {.v = &layouts[2]} },
+	{ ClkWinTitle,          0,              Button1,        togglewin,      {0} },
 	{ ClkWinTitle,          0,              Button2,        zoom,           {0} },
 	{ ClkStatusText,        0,              Button1,        sigstatusbar,   {.i = 1} },
 	{ ClkStatusText,        0,              Button2,        sigstatusbar,   {.i = 2} },
 	{ ClkStatusText,        0,              Button3,        sigstatusbar,   {.i = 3} },
-	{ ClkStatusText,	0,		Button4,	sigstatusbar,	{.i = 4} },
-	{ ClkStatusText,	0,		Button5,	sigstatusbar,	{.i = 5} },
+	{ ClkStatusText,        0,              Button4,        sigstatusbar,   {.i = 4} },
+	{ ClkStatusText,        0,              Button5,        sigstatusbar,   {.i = 5} },
 	{ ClkClientWin,         MODKEY,         Button1,        movemouse,      {0} },
 	{ ClkClientWin,         MODKEY,         Button2,        togglefloating, {0} },
 	{ ClkClientWin,         MODKEY,         Button3,        resizemouse,    {0} },
