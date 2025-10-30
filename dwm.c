@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <X11/cursorfont.h>
@@ -56,6 +57,7 @@
 #define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
 #define TAGMASK                 ((1 << LENGTH(tags)) - 1)
 #define TEXTW(X)                (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define OPAQUE                  0xffU
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
@@ -154,6 +156,7 @@ typedef struct {
 } Rule;
 
 /* function declarations */
+static void alttab(const Arg *arg);
 static void applyrules(Client *c);
 static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
 static void arrange(Monitor *m);
@@ -187,6 +190,7 @@ static void focusmon(const Arg *arg);
 static void focusstackvis(const Arg *arg);
 static void focusstackhid(const Arg *arg);
 static void focusstack(int inc, int vis);
+static void focusnext(const Arg *arg);
 static Atom getatomprop(Client *c, Atom prop);
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
@@ -253,11 +257,14 @@ static void updatetitle(Client *c);
 static void updatewindowtype(Client *c);
 static void updatewmhints(Client *c);
 static void view(const Arg *arg);
+static void cycleview(const Arg *arg);
 static Client *wintoclient(Window w);
 static Monitor *wintomon(Window w);
+static void winview(const Arg* arg);
 static int xerror(Display *dpy, XErrorEvent *ee);
 static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
+static void xinitvisual();
 static void zoom(const Arg *arg);
 
 /* variables */
@@ -297,6 +304,12 @@ static Drw *drw;
 static Monitor *mons, *selmon;
 static Window root, wmcheckwin;
 
+static int useargb = 0;
+static Visual *visual;
+static int depth;
+static Colormap cmap;
+static int alt_tab_direction = 0;
+
 /* configuration, allows nested code to access above variables */
 #include "config.h"
 
@@ -304,6 +317,79 @@ static Window root, wmcheckwin;
 struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 /* function implementations */
+
+static void
+alttab(const Arg *arg) {
+
+	view(&(Arg){ .ui = ~0 });
+	focusnext(&(Arg){ .i = alt_tab_direction });
+
+	int grabbed = 1;
+	int grabbed_keyboard = 1000;
+	for (int i = 0; i < 100; i += 1) {
+		struct timespec ts;
+		ts.tv_sec = 0;
+		ts.tv_nsec = 1000000;
+
+		if (grabbed_keyboard != GrabSuccess) {
+			grabbed_keyboard = XGrabKeyboard(dpy, DefaultRootWindow(dpy), True,
+											 GrabModeAsync, GrabModeAsync, CurrentTime);
+		}
+		if (grabbed_keyboard == GrabSuccess) {
+			XGrabButton(dpy, AnyButton, AnyModifier, None, False,
+						BUTTONMASK, GrabModeAsync, GrabModeAsync,
+						None, None);
+			break;
+		}
+		nanosleep(&ts, NULL);
+		if (i == 100 - 1)
+			grabbed = 0;
+	}
+
+	XEvent event;
+	Client *c;
+	Monitor *m;
+	XButtonPressedEvent *ev;
+
+	while (grabbed) {
+		XNextEvent(dpy, &event);
+		switch (event.type) {
+		case KeyPress:
+			if (event.xkey.keycode == tabCycleKey)
+				focusnext(&(Arg){ .i = alt_tab_direction });
+			break;
+		case KeyRelease:
+			if (event.xkey.keycode == tabModKey) {
+				XUngrabKeyboard(dpy, CurrentTime);
+				XUngrabButton(dpy, AnyButton, AnyModifier, None);
+				grabbed = 0;
+				alt_tab_direction = !alt_tab_direction;
+				winview(0);
+			}
+			break;
+	    case ButtonPress:
+			ev = &(event.xbutton);
+			if ((m = wintomon(ev->window)) && m != selmon) {
+				unfocus(selmon->sel, 1);
+				selmon = m;
+				focus(NULL);
+			}
+			if ((c = wintoclient(ev->window)))
+				focus(c);
+			XAllowEvents(dpy, AsyncBoth, CurrentTime);
+			break;
+		case ButtonRelease:
+			XUngrabKeyboard(dpy, CurrentTime);
+			XUngrabButton(dpy, AnyButton, AnyModifier, None);
+			grabbed = 0;
+			alt_tab_direction = !alt_tab_direction;
+			winview(0);
+			break;
+		}
+	}
+	return;
+}
+
 void
 applyrules(Client *c)
 {
@@ -1428,6 +1514,28 @@ manage(Window w, XWindowAttributes *wa)
 	focus(NULL);
 }
 
+static void
+focusnext(const Arg *arg) {
+	Monitor *m;
+	Client *c;
+	m = selmon;
+	c = m->sel;
+
+	if (arg->i) {
+		if (c->next)
+			c = c->next;
+		else
+			c = m->clients;
+	} else {
+		Client *last = c;
+		if (last == m->clients)
+			last = NULL;
+		for (c = m->clients; c->next != last; c = c->next);
+	}
+	focus(c);
+	return;
+}
+
 void
 mappingnotify(XEvent *e)
 {
@@ -1984,7 +2092,8 @@ setup(void)
 	sw = DisplayWidth(dpy, screen);
 	sh = DisplayHeight(dpy, screen);
 	root = RootWindow(dpy, screen);
-	drw = drw_create(dpy, screen, root, sw, sh);
+	xinitvisual();
+	drw = drw_create(dpy, screen, root, sw, sh, visual, depth, cmap);
 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
 		die("no fonts could be loaded.");
 	lrpad = drw->fonts->h;
@@ -2012,7 +2121,7 @@ setup(void)
 	/* init appearance */
 	scheme = ecalloc(LENGTH(colors), sizeof(Clr *));
 	for (i = 0; i < LENGTH(colors); i++)
-		scheme[i] = drw_scm_create(drw, colors[i], 3);
+		scheme[i] = drw_scm_create(drw, colors[i], alphas[i], 3);
 	/* init bars */
 	updatebars();
 	updatestatus();
@@ -2286,16 +2395,18 @@ updatebars(void)
 	Monitor *m;
 	XSetWindowAttributes wa = {
 		.override_redirect = True,
-		.background_pixmap = ParentRelative,
+		.background_pixel = 0,
+		.border_pixel = 0,
+		.colormap = cmap,
 		.event_mask = ButtonPressMask|ExposureMask
 	};
 	XClassHint ch = {"dwm", "dwm"};
 	for (m = mons; m; m = m->next) {
 		if (m->barwin)
 			continue;
-		m->barwin = XCreateWindow(dpy, root, m->wx, m->by, m->ww, bh, 0, DefaultDepth(dpy, screen),
-				CopyFromParent, DefaultVisual(dpy, screen),
-				CWOverrideRedirect|CWBackPixmap|CWEventMask, &wa);
+		m->barwin = XCreateWindow(dpy, root, m->wx, m->by, m->ww, bh, 0, depth,
+				InputOutput, visual,
+				CWOverrideRedirect|CWBackPixel|CWBorderPixel|CWColormap|CWEventMask, &wa);
 		XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
 		XMapRaised(dpy, m->barwin);
 		XSelectInput(dpy, m->barwin, ButtonPressMask|PointerMotionMask);
@@ -2534,6 +2645,21 @@ updatewmhints(Client *c)
 }
 
 void
+cycleview(const Arg *arg) {
+	 unsigned int newtag ;
+	if (arg->ui) { /* if ui is 1 goto the left if 0 goto the right */
+	    newtag = selmon->tagset[selmon->seltags] >> 1;
+	    if (newtag == 0) newtag = (1 << (LENGTH(tags) - 1));
+	}
+	else{
+	    newtag = selmon->tagset[selmon->seltags] << 1;
+	    if (newtag > ( 1 << (LENGTH(tags) - 1))) newtag = 1;
+	}
+    Arg a = { .ui = newtag};
+    view(&a);
+}
+
+void
 view(const Arg *arg)
 {
 	if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
@@ -2575,6 +2701,26 @@ wintomon(Window w)
 	return selmon;
 }
 
+/* Selects for the view of the focused window. The list of tags */
+/* to be displayed is matched to the focused window tag list. */
+void
+winview(const Arg* arg){
+	Window win, win_r, win_p, *win_c;
+	unsigned nc;
+	int unused;
+	Client* c;
+	Arg a;
+
+	if (!XGetInputFocus(dpy, &win, &unused)) return;
+	while(XQueryTree(dpy, win, &win_r, &win_p, &win_c, &nc)
+	      && win_p != win_r) win = win_p;
+
+	if (!(c = wintoclient(win))) return;
+
+	a.ui = c->tags;
+	view(&a);
+}
+
 /* There's no way to check accesses to destroyed windows, thus those cases are
  * ignored (especially on UnmapNotify's). Other types of errors call Xlibs
  * default error handler, which may call exit. */
@@ -2609,6 +2755,43 @@ xerrorstart(Display *dpy, XErrorEvent *ee)
 {
 	die("dwm: another window manager is already running");
 	return -1;
+}
+
+void
+xinitvisual()
+{
+    XVisualInfo *infos;
+	XRenderPictFormat *fmt;
+	int nitems;
+	int i;
+
+	XVisualInfo tpl = {
+        .screen = screen,
+		.depth = 32,
+		.class = TrueColor
+	};
+	long masks = VisualScreenMask | VisualDepthMask | VisualClassMask;
+
+	infos = XGetVisualInfo(dpy, masks, &tpl, &nitems);
+	visual = NULL;
+	for(i = 0; i < nitems; i ++) {
+        fmt = XRenderFindVisualFormat(dpy, infos[i].visual);
+		if (fmt->type == PictTypeDirect && fmt->direct.alphaMask) {
+            visual = infos[i].visual;
+			depth = infos[i].depth;
+			cmap = XCreateColormap(dpy, root, visual, AllocNone);
+			useargb = 1;
+			break;
+        }
+    }
+
+	XFree(infos);
+
+	if (! visual) {
+        visual = DefaultVisual(dpy, screen);
+		depth = DefaultDepth(dpy, screen);
+		cmap = DefaultColormap(dpy, screen);
+    }
 }
 
 void
