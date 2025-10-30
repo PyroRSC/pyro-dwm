@@ -13,7 +13,7 @@ static const unsigned int gappov    = 10;       /* vert outer gap between window
 static       int smartgaps          = 0;        /* 1 means no outer gap when there is only one window */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
-static const char *fonts[]          = { "monospace:size=10" };
+static const char *fonts[]          = { "Font Awesome 6 Free Solid:size=12" };
 static const char dmenufont[]       = "monospace:size=10";
 static const char col_gray1[]       = "#404242";
 static const char col_gray2[]       = "#706b6b";
@@ -51,9 +51,10 @@ static const Rule rules[] = {
 	 *	WM_NAME(STRING) = title
 	 */
 	/* class      instance    title       tags mask     isfloating   monitor   appicon*/
-	{ "Gimp",     NULL,       NULL,       0,            1,           -1,         NULL },
-	{ "firefox",  NULL,       NULL,       0,       0,           -1,         "󰈹"  },
-	{ "st",	NULL,	NULL,	0,	0,	-1,	NULL}
+	{ "Gimp",     	NULL,   NULL,       	0,      1,      -1,         NULL },
+	{ "firefox",  	NULL,   NULL,       	0,      0,      -1,         "󰈹"  },
+	{ "st",		"St",	NULL,		0,	0,	-1,	    ""	 },
+	{"discord",NULL,NULL,0,0,-1,""},
 };
 
 /* layout(s) */
@@ -101,7 +102,7 @@ static const Layout layouts[] = {
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
-static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
+static const char *dmenucmd[] = { "dmenu_run", NULL };
 static const char *termcmd[]  = { "st", NULL };
 
 static const Key keys[] = {
@@ -180,6 +181,8 @@ static const Button buttons[] = {
 	{ ClkStatusText,        0,              Button1,        sigstatusbar,   {.i = 1} },
 	{ ClkStatusText,        0,              Button2,        sigstatusbar,   {.i = 2} },
 	{ ClkStatusText,        0,              Button3,        sigstatusbar,   {.i = 3} },
+	{ ClkStatusText,	0,		Button4,	sigstatusbar,	{.i = 4} },
+	{ ClkStatusText,	0,		Button5,	sigstatusbar,	{.i = 5} },
 	{ ClkClientWin,         MODKEY,         Button1,        movemouse,      {0} },
 	{ ClkClientWin,         MODKEY,         Button2,        togglefloating, {0} },
 	{ ClkClientWin,         MODKEY,         Button3,        resizemouse,    {0} },
