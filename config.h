@@ -1,7 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 
 /* appearance */
-static const unsigned int borderpx  = 1;        /* border pixel of windows */
+static const unsigned int borderpx  = 2;        /* border pixel of windows */
 static const unsigned int tabModKey = 0x40;
 static const unsigned int tabCycleKey = 0x17;
 static const unsigned int gappx     = 8;        /* gaps between windows */
@@ -20,19 +20,19 @@ static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
 static const char *fonts[]          = { "monospace:size=10" };
 static const char dmenufont[]       = "monospace:size=10";
-static const char col_gray1[]       = "#404242";
-static const char col_gray2[]       = "#706b6b";
-static const char col_gray3[]       = "#bbbbbb";
-static const char col_gray4[]       = "#eeeeee";
-static const char col_cyan[]        = "#db5353";
-static const unsigned int baralpha = 0xd0;
-static const unsigned int borderalpha = OPAQUE;
+static const char col_gray1[] = "#1a1b26"; /* background */
+static const char col_gray2[] = "#3b4261"; /* inactive border */
+static const char col_gray3[] = "#c0caf5"; /* foreground */
+static const char col_gray4[] = "#565f89"; /* dim text */
+static const char col_primary[]        = "#7aa2f7";
+static const unsigned int baralpha = 0xe6;
+static const unsigned int borderalpha = 0xff;
 static const char *colors[][5]      = {
 	/*               fg         bg         border   */
 	[SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
-	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
-	[SchemeHov]  = { col_gray4, col_cyan,  col_cyan  },
-	[SchemeHid]  = { col_cyan,  col_gray1, col_cyan  },
+	[SchemeSel]  = { col_gray4, col_primary,  col_primary  },
+	[SchemeHov]  = { col_gray4, col_primary,  col_primary  },
+	[SchemeHid]  = { col_primary,  col_gray1, col_primary  },
 };
 
 
@@ -65,6 +65,7 @@ static const Rule rules[] = {
 	{ "firefox",  	NULL,   NULL,       	0,      0,      -1,         "󰈹"  },
 	{ "st",		"St",	NULL,		0,	0,	-1,	    ""	 },
 	{"discord",NULL,NULL,0,0,-1,""},
+	{"spotify",NULL,NULL,0,0,-1,""}
 };
 
 /* layout(s) */
@@ -113,7 +114,7 @@ static const Layout layouts[] = {
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
-static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
+static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_primary, "-sf", col_gray4, NULL };
 static const char *termcmd[]  = { "st", NULL };
 
 static const Key keys[] = {
@@ -183,6 +184,7 @@ static const Key keys[] = {
 	{ 0,				XF86XK_AudioPlay,	spawn, SHCMD("playerctl play-pause")},
 	{ 0, 				XF86XK_AudioNext, 	spawn, SHCMD("playerctl next") },
 	{ 0, 				XF86XK_AudioPrev,   	spawn, SHCMD("playerctl previous") },
+	{MODKEY,			XK_e,		spawn, SHCMD("yazi")},
 };
 
 /* button definitions */
