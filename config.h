@@ -116,7 +116,7 @@ static const Layout layouts[] = {
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_primary, "-sf", col_gray4, NULL };
 static const char *termcmd[]  = { "st", NULL };
-
+static const char *yazicmd[] = { "st", "-e", "sh", "-c", "yazi", NULL };
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
 	{ MODKEY,                       XK_p,      spawn,          {.v = dmenucmd } },
@@ -184,7 +184,7 @@ static const Key keys[] = {
 	{ 0,				XF86XK_AudioPlay,	spawn, SHCMD("playerctl play-pause")},
 	{ 0, 				XF86XK_AudioNext, 	spawn, SHCMD("playerctl next") },
 	{ 0, 				XF86XK_AudioPrev,   	spawn, SHCMD("playerctl previous") },
-	{MODKEY,			XK_e,		spawn, SHCMD("yazi")},
+	{MODKEY,			XK_e,		spawn, {.v = yazicmd}},
 };
 
 /* button definitions */
