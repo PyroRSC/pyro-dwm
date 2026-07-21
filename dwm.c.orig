@@ -269,7 +269,7 @@ static void zoom(const Arg *arg);
 
 /* variables */
 static const char broken[] = "broken";
-static char stext[1024];
+static char stext[256];
 static int statusw;
 static int statussig;
 static pid_t statuspid = -1;
@@ -986,13 +986,14 @@ drawbar(Monitor *m)
 	int boxw = drw->fonts->h / 6 + 2;
 	unsigned int i, occ = 0, urg = 0;
 	Client *c;
-	
+
+	if (!m->showbar)
+		return;
+
 	/* draw status first so it can be overdrawn by tags later */
-	if (m == selmon || 1) { /* status is only drawn on selected monitor */
+	if (m == selmon) { /* status is only drawn on selected monitor */
 		char *text, *s, ch;
 		drw_setscheme(drw, scheme[SchemeNorm]);
-		tw = TEXTW(stext) - lrpad + 2; /* 2px right padding */
-		drw_text(drw, m->ww - tw, 0, tw, bh, 0, stext, 0);
 
 		x = 0;
 		for (text = s = stext; *s; s++) {
@@ -2581,16 +2582,8 @@ updatesizehints(Client *c)
 void
 updatestatus(void)
 {
-
 	if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext))) {
 		strcpy(stext, "dwm-"VERSION);
-
-		Monitor* m;
-		for(m = mons; m; m = m->next)
-			drawbar(m);
-
-
-
 		statusw = TEXTW(stext) - lrpad + 2;
 	} else {
 		char *text, *s, ch;
